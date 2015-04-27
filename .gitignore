@@ -45,3 +45,4 @@ private-key-password.txt
 license.xml
 cert.p12
 /bin/
+/template-IdP

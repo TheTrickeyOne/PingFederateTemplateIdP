@@ -1,4 +1,4 @@
-package com.pingidentity.adapter.idp;
+package com.template.adapter.idp;
 
 import java.io.IOException;
 import java.lang.Object;
@@ -28,8 +28,6 @@ import org.sourceid.saml20.adapter.gui.LdapDatastoreFieldDescriptor;
 import org.sourceid.saml20.adapter.gui.validation.impl.IntegerValidator;
 import org.sourceid.saml20.adapter.gui.validation.impl.RequiredFieldValidator;
 
-import com.pingidentity.access.DataSourceAccessor;
-
 import org.sourceid.saml20.adapter.idp.authn.AuthnPolicy;
 import org.sourceid.saml20.adapter.idp.authn.IdpAuthnAdapterDescriptor;
 import org.sourceid.saml20.domain.SpConnection;
@@ -42,6 +40,15 @@ import com.pingidentity.common.security.UsernameRule;
 import com.pingidentity.common.util.HTMLEncoder;
 import com.pingidentity.sdk.AuthnAdapterResponse;
 import com.pingidentity.sdk.IdpAuthenticationAdapterV2;
+import com.template.adapter.idp.util.DefaultProperties;
+import com.template.adapter.idp.util.LDAPUtil;
+import com.template.adapter.idp.util.LdapAttributeFinder;
+import com.template.adapter.idp.util.LdapLookupException;
+
+
+
+//LDAP
+import javax.naming.directory.Attributes;
 
 /**
  * <p>
@@ -53,11 +60,22 @@ import com.pingidentity.sdk.IdpAuthenticationAdapterV2;
  */
 public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
-    public static final String ADAPTER_NAME = "Template Adapter";
+    private static final String ADAPTER_NAME = "Template Adapter";
+	private static final String ADAPTER_VERSION = "1.0";
     private final Log log = LogFactory.getLog(this.getClass());
 
+    //LDAP
+    private boolean queryDirectory;
+    private static final LDAPUtil ldapUtil = new LDAPUtil();
+    private String ldapDataSourceAlias;
+    private LdapAttributeFinder ldapAttributeFinder;
+    private DefaultProperties defaultProperties;
+    
+    //Session
     private static final SecureRandom secureRandom = new SecureRandom();
+    private static final String REQUEST_TOKEN_SESSION_KEY = "RequestToken";
 
+    //Templates
     public static String FAILED_MESSAGE = "Failed - Please try again";
 
     public static final String FIELD_LOGIN_TEMPLATE_NAME = "Login Template";
@@ -77,21 +95,17 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
     private static final String FORM_FIELD_ARG1 = "input1";
     private static final String FORM_FIELD_REQUEST_ID = "request_id";
 
-    // session value keys
-    private static final String REQUEST_TOKEN_SESSION_KEY = "RequestToken";
-
     private final IdpAuthnAdapterDescriptor descriptor;
     private String htmlTemplate;
     private String htmlFailureTemplate;
     private boolean allowOptOut = false;
     private boolean allowNonInteractive = false;
-    private int maxChallenges=10;
-    private int numChallenges = 0;
 
     public TemplateAdapter() {
 
         AdapterConfigurationGuiDescriptor guiDescriptor = new AdapterConfigurationGuiDescriptor();
 
+        //Template Handling
         TextFieldDescriptor loginTemplateName = new TextFieldDescriptor(FIELD_LOGIN_TEMPLATE_NAME, DESC_LOGIN_TEMPLATE_NAME);
         loginTemplateName.addValidator(new RequiredFieldValidator());
         loginTemplateName.setDefaultValue(DEFAULT_LOGIN_TEMPLATE_NAME);
@@ -102,11 +116,32 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
         failureTemplateName.setDefaultValue(DEFAULT_FAILURE_TEMPLATE_NAME);
         guiDescriptor.addField(failureTemplateName);
 
+        //Configuration File Settings location
+        TextFieldDescriptor baseFileLocationField = new TextFieldDescriptor("Configuration File Location", "The directory location for configuration files.");
+        guiDescriptor.addAdvancedField(baseFileLocationField);
+
+        //LDAP
+        LdapDatastoreFieldDescriptor ldapDatastoreFieldDescriptor = new LdapDatastoreFieldDescriptor("LDAP Data source", "The LDAP data source used for retrieving additional user attributes");
+        guiDescriptor.addAdvancedField(ldapDatastoreFieldDescriptor);
+        
+        CheckBoxFieldDescriptor queryDirectoryField = new CheckBoxFieldDescriptor("Query Directory", "Query directory for every PingID authentication.");
+        queryDirectoryField.setDefaultValue(false);
+        guiDescriptor.addAdvancedField(queryDirectoryField);
+        
+        TextFieldDescriptor baseDomainField = new TextFieldDescriptor("Base Domain", "The base domain for attribute retrieval.");
+        guiDescriptor.addAdvancedField(baseDomainField);
+        
+        TextFieldDescriptor ldapFilerField = new TextFieldDescriptor("Filter", "The filter for attribute retrieval. ${username} may be used to refer to the subject. Example: sAMAccountName=${username}");
+        guiDescriptor.addAdvancedField(ldapFilerField);
+        
+        TextFieldDescriptor fnameAttributeField = new TextFieldDescriptor("fname attribute", "The ldap attribute for fname.");
+        guiDescriptor.addAdvancedField(fnameAttributeField);
+        
+        //Other
         Set<String> attrNames = new HashSet<String>();
         attrNames.add(ATTR_NAME_USER_NAME);
-
-        descriptor = new IdpAuthnAdapterDescriptor(this, ADAPTER_NAME,
-                attrNames, false, guiDescriptor, false);
+       
+        descriptor = new IdpAuthnAdapterDescriptor(this, this.ADAPTER_NAME, attrNames, false, guiDescriptor, false, this.ADAPTER_VERSION);
     }
 
     private void debug_message(String message) {
@@ -116,7 +151,6 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
     }
 
     public IdpAuthnAdapterDescriptor getAdapterDescriptor() {
-
         return descriptor;
     }
 
@@ -134,10 +168,14 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
         htmlTemplate = configuration.getFieldValue(FIELD_LOGIN_TEMPLATE_NAME);
         htmlFailureTemplate = configuration.getFieldValue(FIELD_FAILURE_TEMPLATE_NAME);
+
+        this.ldapDataSourceAlias = configuration.getAdvancedFields().getFieldValue("LDAP Data source");
+        //this.ldapAttributeFinder = new LdapAttributeFinder(this.log, configuration, this.nameValidator, this.emailValidator, ldapDataSourceAccessor, ldapUtil);
+        this.queryDirectory = configuration.getAdvancedFields().getBooleanFieldValue("Query Directory");
+        
     }
 
     public Map<String, Object> getAdapterInfo() {
-
         return null;
     }
 
@@ -222,19 +260,33 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
             }
         } else {
             debug_message("First call");
-            setRequestToken(req);
-            
+
+            //Lookup LDAP
+            Attributes ldapAttributes = null;
+            this.log.debug("Performing LDAP query for user attributes.");
+            try
+            {
+            	ldapAttributes = this.ldapAttributeFinder.getUsersAttributes(userName, this.defaultProperties.getLdapSearchScope(), this.defaultProperties.getLdapCountLimit());
+            }
+            catch (LdapLookupException e)
+            {
+              this.log.warn("Query for attributes failed: " + e.getMessage());
+            }
+
+            setRequestToken(req);           
             req.getSession().setAttribute("success", "true");            
         }
 
         if (responseTemplate != null) {
-        	ResponseTemplateRenderer renderer = ResponseTemplateRenderer.getInstance();        	
+        	ResponseTemplateRenderer renderer = ResponseTemplateRenderer.getInstance();
             renderer.render(req, resp, responseTemplate, responseParams);
         }
 
         adapterAttributes.put(ATTR_NAME_USER_NAME, userName);
         authnAdapterResponse.setAttributeMap(adapterAttributes);
         return authnAdapterResponse;
+
+
     }
 
     /**
