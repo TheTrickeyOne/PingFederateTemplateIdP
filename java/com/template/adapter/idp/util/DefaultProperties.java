@@ -9,10 +9,6 @@ public class DefaultProperties
   private Logger log = Logger.getLogger(DefaultProperties.class);
   public static final String USER_ATTRIBUTE_SUBJECT = "USER_ATTRIBUTE_SUBJECT";
   public static final String USER_ATTRIBUTE_SUBJECT_DEFAULT = "subject";
-  public static final String USER_ATTRIBUTE_FNAME = "USER_ATTRIBUTE_FNAME";
-  public static final String USER_ATTRIBUTE_FNAME_DEFAULT = "fname";
-  public static final String USER_ATTRIBUTE_LNAME = "USER_ATTRIBUTE_LNAME";
-  public static final String USER_ATTRIBUTE_LNAME_DEFAULT = "lname";
   public static final String USER_ATTRIBUTE_EMAIL = "USER_ATTRIBUTE_EMAIL";
   public static final String USER_ATTRIBUTE_EMAIL_DEFAULT = "email";
   public static final String USER_ATTRIBUTE_IS_AUTHENTICATED = "USER_ATTRIBUTE_IS_AUTHENTICATED";
@@ -59,11 +55,7 @@ public class DefaultProperties
     this.ldapSearchScope = (defaultProperties.containsKey("LDAP_SEARCH_SCOPE") ? Integer.parseInt(defaultProperties.getProperty("LDAP_SEARCH_SCOPE")) : 3);
     
     this.ldapCountLimit = (defaultProperties.containsKey("LDAP_COUNT_LIMIT") ? Integer.parseInt(defaultProperties.getProperty("LDAP_COUNT_LIMIT")) : 1);
-        
-    this.sessionAttrUserAuthenticated = (defaultProperties.containsKey("SESSION_ATTR_USER_AUTHENTICATED") ? defaultProperties.getProperty("SESSION_ATTR_USER_AUTHENTICATED") : "pingid-adapter-user-authenticated-");
-    
-    this.sessionAttrRequestId = (defaultProperties.containsKey("SESSION_ATTR_REQUEST_ID") ? defaultProperties.getProperty("SESSION_ATTR_REQUEST_ID") : "pingid-adapter-request-id-");
-    
+            
     this.requestTokenLifetime = (defaultProperties.containsKey("REQUEST_TOKEN_LIFETIME") ? Integer.parseInt(defaultProperties.getProperty("REQUEST_TOKEN_LIFETIME")) : 300);
   }
     
@@ -91,17 +83,7 @@ public class DefaultProperties
   {
     return this.ldapCountLimit;
   }
-  
-  public String getSessionAttrUserAuthenticated()
-  {
-    return this.sessionAttrUserAuthenticated;
-  }
-  
-  public String getSessionAttrRequestId()
-  {
-    return this.sessionAttrRequestId;
-  }
-  
+    
   public int getRequestTokenLifetime()
   {
     return this.requestTokenLifetime;
