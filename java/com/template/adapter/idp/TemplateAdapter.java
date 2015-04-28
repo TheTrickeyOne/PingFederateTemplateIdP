@@ -5,8 +5,10 @@ import java.lang.Object;
 import java.lang.String;
 import java.math.BigInteger;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -41,6 +43,7 @@ import com.pingidentity.common.security.UsernameRule;
 import com.pingidentity.common.util.HTMLEncoder;
 import com.pingidentity.sdk.AuthnAdapterResponse;
 import com.pingidentity.sdk.IdpAuthenticationAdapterV2;
+
 //Dependent Classes
 import com.template.adapter.idp.util.*;
 
@@ -83,20 +86,26 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
     private static final String FORM_FIELD_ARG1 = "input1";
     private static final String FORM_FIELD_REQUEST_ID = "request_id";
 
-    private final IdpAuthnAdapterDescriptor descriptor;
     private String htmlTemplate;
     private String htmlFailureTemplate;
     private boolean allowOptOut = false;
     private boolean allowNonInteractive = false;
 
-    
     //LDAP
     private Properties properties = new Properties();
-    private LDAPUtil ldapUtil = null;
+    private LDAPQuery ldapQuery = null;
+    
+    public TemplateAdapter() {   
+    }
 
-    public TemplateAdapter() {
+    private void debug_message(String message) {
+        log.debug(message);
+        System.out.println("**********************************");
+        System.out.println(message);
+    }
 
-        AdapterConfigurationGuiDescriptor guiDescriptor = new AdapterConfigurationGuiDescriptor();
+    public IdpAuthnAdapterDescriptor getAdapterDescriptor() {
+    	AdapterConfigurationGuiDescriptor guiDescriptor = new AdapterConfigurationGuiDescriptor();
 
         //Configuration File Settings location
         TextFieldDescriptor baseFileLocationField = new TextFieldDescriptor("Configuration File Location", "The directory location for configuration files.");
@@ -120,30 +129,14 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
         TextFieldDescriptor baseDomainField = new TextFieldDescriptor("Base Domain", "The base domain for attribute retrieval.");
         guiDescriptor.addAdvancedField(baseDomainField);
         
-        TextFieldDescriptor ldapFilterField = new TextFieldDescriptor("Filter", "The filter for attribute retrieval. ${username} may be used to refer to the subject. Example: userPrincipal=${username}");
+        TextFieldDescriptor ldapFilterField = new TextFieldDescriptor("Filter", "The filter for attribute retrieval. ${username} may be used to refer to the subject. Example: userPrincipalName=${username}");
         guiDescriptor.addAdvancedField(ldapFilterField);
-        
-        TextFieldDescriptor ldapLoginDN = new TextFieldDescriptor("Service Account", "The DN of the Service Account used for Authentication");
-        guiDescriptor.addAdvancedField(ldapLoginDN);
                         
-        PasswordCredentialValidatorFieldDescriptor ldapPasswordField = new PasswordCredentialValidatorFieldDescriptor("Service Account Password", "The Password for the Service Account");
-        guiDescriptor.addAdvancedField(ldapPasswordField);       
-                
         //Other
         Set<String> attrNames = new HashSet<String>();
         attrNames.add(ATTR_NAME_USER_NAME);
-       
-        descriptor = new IdpAuthnAdapterDescriptor(this, this.ADAPTER_NAME, attrNames, false, guiDescriptor, false, this.ADAPTER_VERSION);
-    }
-
-    private void debug_message(String message) {
-        log.debug(message);
-        System.out.println("**********************************");
-        System.out.println(message);
-    }
-
-    public IdpAuthnAdapterDescriptor getAdapterDescriptor() {
-        return descriptor;
+        
+        return new IdpAuthnAdapterDescriptor(this, this.ADAPTER_NAME, attrNames, false, guiDescriptor, false, this.ADAPTER_VERSION);
     }
 
     @SuppressWarnings("rawtypes")
@@ -162,12 +155,10 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
         htmlFailureTemplate = configuration.getFieldValue(FIELD_FAILURE_TEMPLATE_NAME);
         
 		properties.setProperty("host", configuration.getFieldValue("LDAP Data source"));
-		properties.setProperty("loginDN", configuration.getFieldValue("Service Account"));
-		properties.setProperty("loginPassword", configuration.getFieldValue("Service Account Password"));
 		properties.setProperty("baseDN",configuration.getFieldValue("Base Domain"));
 		properties.setProperty("filter",configuration.getFieldValue("Filter"));
-
-		ldapUtil = new LDAPUtil(properties);
+		
+		ldapQuery = new LDAPQuery(configuration.getFieldValue("LDAP Data source"));
     }
 
     public Map<String, Object> getAdapterInfo() {
@@ -258,14 +249,21 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
             setRequestToken(req);         
 
             //Lookup LDAP
-            try {
-				String result = ldapUtil.getAttributeValue(properties.getProperty("Filter"));
-				log.debug("Result of LDAP call " + result);
-	            req.getSession().setAttribute("success", "true");            
-
-			} catch (NamingException e1) {
-				log.debug("Result of LDAP call " + e1.toString());	            
-	            req.getSession().setAttribute("success", "false");            							}           
+        	List<String>attributes = new ArrayList<String>();
+        	attributes.add("mobile");
+        	
+			List<String>result = ldapQuery.getAttributes(properties.getProperty("BaseDN"), properties.getProperty("Filter"), attributes);
+			
+			if (result.size() == 1) {
+				log.debug("Result of LDAP call " + result.get(0));
+	            req.getSession().setAttribute("success", "true");
+	            req.getSession().setAttribute("mobile", result.get(0));
+			}
+			else
+			{
+				log.debug("No results found for the user " + result.get(0));
+	            req.getSession().setAttribute("success", "false");				
+			}
         }
 
         if (responseTemplate != null) {
