@@ -58,7 +58,7 @@ import com.template.adapter.idp.util.*;
 public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
     private static final String ADAPTER_NAME = "Template Adapter";
-	private static final String ADAPTER_VERSION = "1.0";
+	private static final String ADAPTER_VERSION = "1.1";
     private final Logger log = Logger.getLogger(this.getClass());
     
     //Session
@@ -227,7 +227,7 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
         String resumePath = inParameters.get(IN_PARAMETER_NAME_RESUME_PATH).toString();
         String partnerEntityId = inParameters.get(IN_PARAMETER_NAME_PARTNER_ENTITYID).toString();
-        String userName = chainedAttributes.get("username").getValue();
+        String userName = chainedAttributes.get("username").getValue().toString();
         
         String responseTemplate = htmlTemplate;
         Map<String, Object> responseParams = new HashMap<String, Object>();
