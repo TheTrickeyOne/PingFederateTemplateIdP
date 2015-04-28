@@ -131,6 +131,9 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
         
         TextFieldDescriptor ldapFilterField = new TextFieldDescriptor("Filter", "The filter for attribute retrieval. ${username} may be used to refer to the subject. Example: userPrincipalName=${username}");
         guiDescriptor.addAdvancedField(ldapFilterField);
+        
+        TextFieldDescriptor attributeField = new TextFieldDescriptor("Attribute", "The LDAP attributes to return.");
+        guiDescriptor.addAdvancedField(attributeField);
                         
         //Other
         Set<String> attrNames = new HashSet<String>();
@@ -157,6 +160,7 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 		properties.setProperty("host", configuration.getFieldValue("LDAP Data source"));
 		properties.setProperty("baseDN",configuration.getFieldValue("Base Domain"));
 		properties.setProperty("filter",configuration.getFieldValue("Filter"));
+		properties.setProperty("attribute",configuration.getFieldValue("Attribute"));
 		
 		ldapQuery = new LDAPQuery(configuration.getFieldValue("LDAP Data source"));
     }
@@ -250,11 +254,11 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
             //Lookup LDAP
         	List<String>attributes = new ArrayList<String>();
-        	attributes.add("mobile");
+        	attributes.add(properties.getProperty("attribute"));
         	
 			List<String>result = ldapQuery.getAttributes(properties.getProperty("BaseDN"), properties.getProperty("Filter"), attributes);
 			
-			if (result.size() == 1) {
+			if (result.size() == 1) {												
 				log.debug("Result of LDAP call " + result.get(0));
 	            req.getSession().setAttribute("success", "true");
 	            req.getSession().setAttribute("mobile", result.get(0));
