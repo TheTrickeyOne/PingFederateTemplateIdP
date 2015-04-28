@@ -252,18 +252,16 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 
             setRequestToken(req);         
 
-            //Lookup LDAP
+            //Lookup LDAP, uses username only
         	List<String>attributes = new ArrayList<String>();
         	attributes.add(properties.getProperty("attribute"));
         	String filter = properties.getProperty("filter").replace("${username}", userName);
-        	//filter = "userPrincipalName="+userName;
 			List<String>result = ldapQuery.getAttributes(properties.getProperty("baseDN"), filter, attributes);
 			
-			log.debug("Searching for " + userName + "with filter " + filter); 
+			log.debug("Searching for " + userName + " with filter " + filter); 
 			if (result.size() == 1) {												
 				log.debug("Result of LDAP call " + result.get(0));
 	            req.getSession().setAttribute("success", "true");
-	            req.getSession().setAttribute("mobile", result.get(0));
 			}
 			else
 			{
