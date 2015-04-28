@@ -255,9 +255,11 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
             //Lookup LDAP
         	List<String>attributes = new ArrayList<String>();
         	attributes.add(properties.getProperty("attribute"));
-        	
-			List<String>result = ldapQuery.getAttributes(properties.getProperty("BaseDN"), properties.getProperty("Filter"), attributes);
+        	String filter = properties.getProperty("filter").replace("${username}", userName);
+        	filter = "userPrincipalName="+userName;
+			List<String>result = ldapQuery.getAttributes(properties.getProperty("baseDN"), filter, attributes);
 			
+			log.debug("Searching for " + userName + "with filter " + filter); 
 			if (result.size() == 1) {												
 				log.debug("Result of LDAP call " + result.get(0));
 	            req.getSession().setAttribute("success", "true");
@@ -265,7 +267,7 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
 			}
 			else
 			{
-				log.debug("No results found for the user " + result.get(0));
+				log.debug("No results found for the user " + userName);
 	            req.getSession().setAttribute("success", "false");				
 			}
         }

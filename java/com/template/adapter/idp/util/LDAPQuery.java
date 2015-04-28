@@ -50,7 +50,7 @@ public class LDAPQuery {
           }
         }
       } else {
-        log.warn("LDAP query: no attributes found");
+        log.warn("LDAP query: no attributes found for " + ldapFilter + ". BaseDN " + ldapBaseDN);
       }
     } catch(Exception e) {
       log.error("There was an error querying the directory.", e);
