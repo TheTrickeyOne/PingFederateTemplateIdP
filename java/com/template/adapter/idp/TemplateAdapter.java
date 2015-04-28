@@ -256,7 +256,7 @@ public class TemplateAdapter implements IdpAuthenticationAdapterV2 {
         	List<String>attributes = new ArrayList<String>();
         	attributes.add(properties.getProperty("attribute"));
         	String filter = properties.getProperty("filter").replace("${username}", userName);
-        	filter = "userPrincipalName="+userName;
+        	//filter = "userPrincipalName="+userName;
 			List<String>result = ldapQuery.getAttributes(properties.getProperty("baseDN"), filter, attributes);
 			
 			log.debug("Searching for " + userName + "with filter " + filter); 
